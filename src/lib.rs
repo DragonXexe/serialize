@@ -2,7 +2,7 @@
 mod test;
 
 use std::fs;
-
+pub use serialize_derive::Serialize;
 
 pub trait SetGetBytes {
     fn set_byte(&mut self, byte: usize, data: u8);
