@@ -1,6 +1,5 @@
 {
     "rust-analyzer.linkedProjects": [
-        ".\\serialize_derive\\Cargo.toml",
         ".\\Cargo.toml"
     ]
 }
