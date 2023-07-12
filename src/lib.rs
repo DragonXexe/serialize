@@ -182,6 +182,21 @@ impl Iterator for Bytes {
     }
 }
 
+impl Serialize for bool {
+    fn serialize(self) -> Bytes {
+        Bytes(vec![self as u8], 0)
+    }
+    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
+        if bytes.is_inbound(index) {
+            return Some(bytes.read_byte(index) != 0);
+        } else {
+            return None;
+        }
+    }
+    fn size(&self) -> usize {
+        1
+    }
+}
 impl Serialize for u8 {
     fn serialize(self) -> Bytes {
         Bytes(vec![self], 0)
