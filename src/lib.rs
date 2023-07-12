@@ -355,6 +355,48 @@ impl Serialize for String {
     }
 }
 
+impl<T: Serialize> Serialize for Option<T> {
+    fn serialize(self) -> Bytes {
+        if self.is_none() {
+            let mut bytes = Bytes::new();
+            bytes.push_byte(0);
+            return bytes;
+        } else {
+            let mut bytes = Bytes::new();
+            bytes.push(self.unwrap());
+            return bytes;
+        }
+    }
+    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
+        let is_some: bool;
+        if let Some(discrimenent) = bytes.read::<u8>(index) {
+            if discrimenent == 0 {
+                is_some = false;
+            } else if discrimenent == 1 {
+                is_some = true;
+            } else {
+                return None;
+            }
+        } else {
+            return None;
+        }
+        if !is_some {
+            return Some(None);
+        }
+        if let Some(item) = bytes.read(index+1) {
+            return Some(Some(item));
+        } else {
+            return None;
+        }
+    }
+    fn size(&self) -> usize {
+        1 + match self {
+            Some(item) => item.size(),
+            None => 0,
+        }
+    }
+}
+
 /// a special type that can be used to make strings
 /// with longer lenghts as the u16 indicates this has a len
 /// that is defined by a u16 instead of a u8 like for a normal string
