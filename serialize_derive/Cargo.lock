@@ -29,13 +29,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serialr"
-version = "0.1.1"
-dependencies = [
- "serialize_derive",
-]
-
-[[package]]
 name = "syn"
 version = "2.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"

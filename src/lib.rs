@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod test;
 
 use std::fs;
 
@@ -52,7 +54,7 @@ impl SetGetBytes for u16 {
 /// 
 /// # Example
 /// ```
-/// use crate::serialize::Serialize;
+/// use serialr::Serialize;
 /// // string implements serialize
 /// let string = "Hello World".to_string();
 /// // serialize the string
@@ -79,7 +81,7 @@ pub trait Serialize: Sized {
 /// 
 /// # Example
 /// ```
-/// use serialize::Bytes;
+/// use serialr::Bytes;
 /// let mut bytes = Bytes::new();
 /// let string = "Hello World".to_string();
 /// bytes.push(string.clone());
