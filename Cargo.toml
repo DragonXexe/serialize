@@ -6,6 +6,7 @@ license = "MIT"
 description = "This package allow for the serialization and deserialization of things"
 repository  = "https://github.com/DragonXexe/serialize"
 keywords = ["serialize", "save"]
+readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
