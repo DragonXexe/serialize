@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod test;
 
-use std::fs;
 pub use serialize_derive::Serialize;
+use std::fs;
 
 pub trait SetGetBytes {
     fn set_byte(&mut self, byte: usize, data: u8);
@@ -42,16 +42,15 @@ impl SetGetBytes for u16 {
     }
 }
 
-
 /// This is the main part of this crate
 /// implement this trait for the things you want to serialize and deserialize
-/// 
+///
 /// this is meant to be used for saving things in files or transmitting things through buffers
 /// # Warning
 /// the normal String has maximum length of 255
 /// if you want longer strings use the U16String wich allows
 /// for strings with a length 65535
-/// 
+///
 /// # Example
 /// ```
 /// use serialr::Serialize;
@@ -64,7 +63,7 @@ impl SetGetBytes for u16 {
 /// // the result will be the same
 /// assert_eq!(string, found_string);
 /// ```
-/// 
+///
 pub trait Serialize: Sized {
     fn serialize(self) -> Bytes;
     fn deserialize(bytes: &Bytes, index: usize) -> Option<Self>;
@@ -72,13 +71,13 @@ pub trait Serialize: Sized {
 }
 
 /// This is the struct returned by serialize
-/// 
+///
 /// Bytes can be used to save and load from files
 /// and you are able to read and write to it
 /// the main way you can write to it is by the read, push and write
 /// functions they can use the turbo fish notation to write and read and push
 /// any type that implements the Serialize trait
-/// 
+///
 /// # Example
 /// ```
 /// use serialr::Bytes;
@@ -104,7 +103,7 @@ impl Bytes {
         while len < self.0.len() {
             self.0.pop();
         }
-    } 
+    }
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -121,7 +120,7 @@ impl Bytes {
     pub fn push_byte(&mut self, byte: u8) {
         self.0.push(byte);
     }
-    
+
     pub fn write<T: Serialize>(&mut self, index: usize, val: T) {
         let bytes = val.serialize();
         self.insert(index, &bytes);
@@ -133,7 +132,7 @@ impl Bytes {
         let bytes = val.serialize();
         self.append(&bytes);
     }
-    
+
     pub fn insert(&mut self, index: usize, bytes: &Bytes) {
         for i in 0..bytes.len() {
             self.0[index + i] = bytes.read_byte(i);
@@ -153,7 +152,6 @@ impl Bytes {
             Ok(ok) => Ok(Bytes(ok, 0)),
             Err(err) => Err(err),
         }
-        
     }
 }
 impl From<Bytes> for Vec<u8> {
@@ -178,7 +176,6 @@ impl Iterator for Bytes {
         if let Some(byte) = self.0.get(self.1) {
             self.1 += 1;
             return Some(*byte);
-
         } else {
             return None;
         }
@@ -192,7 +189,7 @@ impl Serialize for u8 {
 
     fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
         if bytes.is_inbound(index) {
-            return Some(bytes.read_byte(index))
+            return Some(bytes.read_byte(index));
         } else {
             return None;
         }
@@ -209,7 +206,7 @@ impl Serialize for char {
 
     fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
         if bytes.is_inbound(index) {
-            return Some(bytes.read_byte(index) as char)
+            return Some(bytes.read_byte(index) as char);
         } else {
             return None;
         }
@@ -233,7 +230,7 @@ impl Serialize for u16 {
         let mut res = 0;
         res.set_byte(0, bytes.read_byte(index + 1));
         res.set_byte(1, bytes.read_byte(index + 0));
-        return Some(res)
+        return Some(res);
     }
     fn size(&self) -> usize {
         2
@@ -257,7 +254,7 @@ impl Serialize for u32 {
         res.set_byte(1, bytes.read_byte(index + 2));
         res.set_byte(2, bytes.read_byte(index + 1));
         res.set_byte(3, bytes.read_byte(index + 0));
-        return Some(res)
+        return Some(res);
     }
     fn size(&self) -> usize {
         4
@@ -289,7 +286,7 @@ impl Serialize for u64 {
         res.set_byte(5, bytes.read_byte(index + 2));
         res.set_byte(6, bytes.read_byte(index + 1));
         res.set_byte(7, bytes.read_byte(index + 0));
-        return Some(res)
+        return Some(res);
     }
     fn size(&self) -> usize {
         8
@@ -305,7 +302,7 @@ impl<T: Serialize> Serialize for Vec<T> {
         bytes
     }
     fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index+1) {
+        if !bytes.is_inbound(index + 1) {
             return None;
         }
         let mut res = vec![];
@@ -344,7 +341,7 @@ impl Serialize for String {
         }
         let mut res = String::new();
         let len: u8 = bytes.read_byte(index);
-        for i in 1..len+1 {
+        for i in 1..len + 1 {
             if let Some(item) = bytes.read::<char>(index + i as usize) {
                 res.push(item);
             } else {
@@ -361,7 +358,7 @@ impl Serialize for String {
 /// a special type that can be used to make strings
 /// with longer lenghts as the u16 indicates this has a len
 /// that is defined by a u16 instead of a u8 like for a normal string
-/// 
+///
 pub struct U16String(String);
 impl From<String> for U16String {
     fn from(value: String) -> Self {
@@ -383,12 +380,12 @@ impl Serialize for U16String {
         return bytes;
     }
     fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index+1) {
+        if !bytes.is_inbound(index + 1) {
             return None;
         }
         let mut res = String::new();
         let len: u16 = bytes.read(index)?;
-        for i in 2..len+2 {
+        for i in 2..len + 2 {
             if let Some(item) = bytes.read::<char>(index + i as usize) {
                 res.push(item);
             } else {
@@ -401,4 +398,3 @@ impl Serialize for U16String {
         self.0.len() + 2
     }
 }
-

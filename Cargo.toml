@@ -10,4 +10,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serialize_derive = {git = "https://github.com/DragonXexe/serialize_derive"}
+
+[dependencies.serialize_derive]
+# git = "https://github.com/DragonXexe/serialize_derive"
+path = "../serialize_derive"
