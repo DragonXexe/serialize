@@ -12,5 +12,5 @@ readme = "README.md"
 [dependencies]
 
 [dependencies.serialize_derive]
-# git = "https://github.com/DragonXexe/serialize_derive"
-path = "../serialize_derive"
+git = "https://github.com/DragonXexe/serialize_derive"
+# path = "../serialize_derive"

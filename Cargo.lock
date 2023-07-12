@@ -23,6 +23,7 @@ dependencies = [
 [[package]]
 name = "serialize_derive"
 version = "0.1.0"
+source = "git+https://github.com/DragonXexe/serialize_derive#53253bb4853622328d6be6d440dce96629efcded"
 dependencies = [
  "quote",
  "syn",
