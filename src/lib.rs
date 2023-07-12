@@ -1,5 +1,8 @@
 #[cfg(test)]
 mod test;
+#[allow(unused_imports)]
+#[macro_use]
+extern crate serialize_derive;
 
 pub use serialize_derive::Serialize;
 use std::fs;
