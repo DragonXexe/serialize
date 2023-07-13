@@ -1,3 +1,5 @@
+use std::mem::transmute;
+
 use crate::Serialize;
 
 #[test]
@@ -47,4 +49,11 @@ fn tuple_test() {
     let tuple: (u8,  String,  u8,  u8,  u8,  u8) = (34, "test".to_string(), 34, 34, 34, 34);
     let bytes = tuple.clone().serialize();
     assert_eq!(tuple, bytes.read(0).unwrap());
+}
+
+#[test]
+fn float_test() {
+    let float: f32 = -1.0/0.0;
+    let bytes = float.serialize();
+    assert_eq!(float, bytes.read(0).unwrap())
 }
