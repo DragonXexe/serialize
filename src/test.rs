@@ -42,6 +42,16 @@ pub enum TestEnum1 {
     THREE((usize, f64, isize, f32)),
     FOUR,
 }
+#[derive(Serialize, PartialEq, Clone, Copy, Debug)]
+pub enum CustomOption<T> {
+    Some(T),
+    None,
+}
+#[derive(Serialize, PartialEq, Clone, Debug)]
+pub struct Dict<K, V> {
+    keys: Vec<K>,
+    vals: Vec<V>,
+}
 
 #[test]
 fn tuple_test() {
@@ -69,3 +79,10 @@ fn usize_test() {
     let bytes = num.serialize();
     assert_eq!(num, bytes.read(0).unwrap());
 }
+#[test]
+fn genarics_test() {
+    let option: CustomOption<String> = CustomOption::Some("Test1".to_string());
+    let bytes = option.clone().serialize();
+    assert_eq!(option, bytes.read(0).unwrap());
+}
+

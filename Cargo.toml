@@ -1,6 +1,6 @@
 [package]
 name = "serialr"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 license = "MIT"
 description = "This package allows for the serialization and deserialization of things"
@@ -13,5 +13,4 @@ readme = "README.md"
 
 [dependencies.serialize_derive]
 git = "https://github.com/DragonXexe/serialize_derive"
-version = "0.1.0"
-# path = "../serialize_derive"
+version = "0.1.3"
