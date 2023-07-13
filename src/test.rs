@@ -1,4 +1,3 @@
-use std::mem::transmute;
 
 use crate::Serialize;
 
@@ -56,4 +55,11 @@ fn float_test() {
     let float: f32 = -1.0/0.0;
     let bytes = float.serialize();
     assert_eq!(float, bytes.read(0).unwrap())
+}
+#[test]
+fn array_test() {
+    let array: [u8; 16] = [12; 16];
+    let bytes = array.serialize();
+    assert_eq!(array, bytes.read::<[u8; 16]>(0).unwrap())
+
 }
