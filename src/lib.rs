@@ -44,6 +44,17 @@ impl SetGetBytes for u16 {
         return ((*self >> 8 * byte) & 0xff) as u8;
     }
 }
+impl SetGetBytes for usize {
+    fn set_byte(&mut self, byte: usize, data: u8) {
+        let mask: usize = 0xff << byte * 8;
+        let temp: usize = *self & !mask;
+        *self = temp | ((data as usize) << byte * 8);
+    }
+
+    fn get_byte(&self, byte: usize) -> u8 {
+        return ((*self >> 8 * byte) & 0xff) as u8;
+    }
+}
 
 /// This is the main part of this crate
 /// implement this trait for the things you want to serialize and deserialize
@@ -292,7 +303,7 @@ impl Serialize for u64 {
         return res;
     }
     fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index + 3) {
+        if !bytes.is_inbound(index + 7) {
             return None;
         }
         let mut res = 0;
@@ -310,6 +321,159 @@ impl Serialize for u64 {
         8
     }
 }
+impl Serialize for usize {
+    fn serialize(self) -> Bytes {
+        let mut res = Bytes::new();
+        let size = (usize::BITS/8) as usize;
+        for i in 0..size {
+            let byte = size-1-i;
+            res.push(self.get_byte(byte));
+        }
+        return res;
+    }
+    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
+        let size = (usize::BITS/8) as usize;
+        if !bytes.is_inbound(index + size - 1) {
+            return None;
+        }
+        let mut res: usize = 0;
+        for i in 0..size {
+            let byte = size-1-i;
+            res.set_byte(i, bytes.read_byte(byte));
+        }
+        return Some(res);
+    }
+    fn size(&self) -> usize {
+        (usize::BITS/8) as usize
+    }
+}
+impl Serialize for i8 {
+    fn serialize(self) -> Bytes {
+        let mut bytes = Bytes::new();
+        bytes.write_byte(0, self as u8);
+        return bytes;
+    }
+
+    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
+        if bytes.is_inbound(index) {
+            return Some(bytes.read_byte(index) as i8);
+        } else {
+            return None;
+        }
+    }
+
+    fn size(&self) -> usize {
+        1
+    }
+}
+impl Serialize for i16 {
+    fn serialize(self) -> Bytes {
+        let bytes = self as u16;
+        let mut res = Bytes::new();
+        res.push(bytes.get_byte(1));
+        res.push(bytes.get_byte(0));
+        return res;
+    }
+    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
+        if !bytes.is_inbound(index + 1) {
+            return None;
+        }
+        let mut res: u16 = 0;
+        res.set_byte(0, bytes.read_byte(index + 1));
+        res.set_byte(1, bytes.read_byte(index + 0));
+        return Some(res as i16);
+    }
+    fn size(&self) -> usize {
+        2
+    }
+}
+impl Serialize for i32 {
+    fn serialize(self) -> Bytes {
+        let bytes = self as u32;
+        let mut res = Bytes::new();
+        res.push(bytes.get_byte(3));
+        res.push(bytes.get_byte(2));
+        res.push(bytes.get_byte(1));
+        res.push(bytes.get_byte(0));
+        return res;
+    }
+    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
+        if !bytes.is_inbound(index + 3) {
+            return None;
+        }
+        let mut res: u32 = 0;
+        res.set_byte(0, bytes.read_byte(index + 3));
+        res.set_byte(1, bytes.read_byte(index + 2));
+        res.set_byte(2, bytes.read_byte(index + 1));
+        res.set_byte(3, bytes.read_byte(index + 0));
+        return Some(res as i32);
+    }
+    fn size(&self) -> usize {
+        4
+    }
+}
+impl Serialize for i64 {
+    fn serialize(self) -> Bytes {
+        let bytes = self as u64;
+        let mut res = Bytes::new();
+        res.push(bytes.get_byte(7));
+        res.push(bytes.get_byte(6));
+        res.push(bytes.get_byte(5));
+        res.push(bytes.get_byte(4));
+        res.push(bytes.get_byte(3));
+        res.push(bytes.get_byte(2));
+        res.push(bytes.get_byte(1));
+        res.push(bytes.get_byte(0));
+        return res;
+    }
+    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
+        if !bytes.is_inbound(index + 7) {
+            return None;
+        }
+        let mut res: u64 = 0;
+        res.set_byte(0, bytes.read_byte(index + 7));
+        res.set_byte(1, bytes.read_byte(index + 6));
+        res.set_byte(2, bytes.read_byte(index + 5));
+        res.set_byte(3, bytes.read_byte(index + 4));
+        res.set_byte(4, bytes.read_byte(index + 3));
+        res.set_byte(5, bytes.read_byte(index + 2));
+        res.set_byte(6, bytes.read_byte(index + 1));
+        res.set_byte(7, bytes.read_byte(index + 0));
+        return Some(res as i64);
+    }
+    fn size(&self) -> usize {
+        8
+    }
+}
+impl Serialize for isize {
+    fn serialize(self) -> Bytes {
+        let mut res = Bytes::new();
+        let bytes = self as usize;
+        let size = (isize::BITS/8) as usize;
+        for i in 0..size {
+            let byte = size-1-i;
+            res.push(bytes.get_byte(byte));
+        }
+        return res;
+    }
+    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
+        let size = (isize::BITS/8) as usize;
+        if !bytes.is_inbound(index + size - 1) {
+            return None;
+        }
+        let mut res: usize = 0;
+        for i in 0..size {
+            let byte = size-1-i;
+            res.set_byte(i, bytes.read_byte(byte));
+        }
+        return Some(res as isize);
+    }
+    fn size(&self) -> usize {
+        (isize::BITS/8) as usize
+    }
+}
+
+
 impl<T: Serialize> Serialize for Vec<T> {
     fn serialize(self) -> Bytes {
         let mut bytes = Bytes::new();

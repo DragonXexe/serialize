@@ -33,13 +33,13 @@ fn enum_derive_test() {
 #[derive(Serialize, Debug, Clone, PartialEq)]
 pub enum TestEnum {
     Variant0(u64, String),
-    Variant1(u8, String),
+    Variant1(usize, String),
 }
 #[derive(Serialize, Debug, Clone, PartialEq)]
 pub enum TestEnum1 {
     ONE(String),
     TWO,
-    THREE,
+    THREE((usize, f64, isize, f32)),
     FOUR,
 }
 
@@ -62,4 +62,10 @@ fn array_test() {
     let bytes = array.serialize();
     assert_eq!(array, bytes.read::<[u8; 16]>(0).unwrap())
 
+}
+#[test]
+fn usize_test() {
+    let num: usize = 342453646;
+    let bytes = num.serialize();
+    assert_eq!(num, bytes.read(0).unwrap());
 }
