@@ -2,7 +2,7 @@
 mod test;
 #[allow(unused_imports)]
 #[macro_use]
-extern crate serialize_derive;
+pub extern crate serialize_derive;
 
 pub use serialize_derive::Serialize;
 use std::fs;
@@ -458,3 +458,83 @@ impl Serialize for U16String {
         self.0.len() + 2
     }
 }
+
+
+impl Serialize for () {
+    fn serialize(self) -> Bytes {
+        Bytes::new()
+    }
+
+    fn deserialize(_bytes: &Bytes, _index: usize) -> Option<Self> {
+        Some(())
+    }
+
+    fn size(&self) -> usize {
+        0
+    }
+}
+
+
+
+macro_rules! tuple_impls {
+    ( $( $name:ident )+ ) => {
+        #[allow(non_snake_case)]
+        impl<$($name: Serialize),+> Serialize for ($($name,)+)
+        {
+            fn serialize(self) -> Bytes {
+                let ($($name,)+) = self;
+                let mut bytes = Bytes::new();
+                $(bytes.append(&$name.serialize());)*
+                return bytes;
+            }
+        
+            #[allow(unused_assignments)]
+            fn deserialize(bytes: &Bytes, mut index: usize) -> Option<Self> {
+                let ($($name,)+): ($($name,)+);
+                $(if let Some(field) = bytes.read::<$name>(index) {
+                    index += field.size();
+                    $name = field;
+                } else {
+                    return None;
+                })*
+                return Some(($($name,)+));
+            }
+        
+            fn size(&self) -> usize {
+                let ($($name,)+) = self;
+                $($name.size() + )* 0
+            }
+        }
+    };
+}
+
+tuple_impls! { A }
+tuple_impls! { A B }
+tuple_impls! { A B C }
+tuple_impls! { A B C D }
+tuple_impls! { A B C D E }
+tuple_impls! { A B C D E F }
+tuple_impls! { A B C D E F G }
+tuple_impls! { A B C D E F G H }
+tuple_impls! { A B C D E F G H I }
+tuple_impls! { A B C D E F G H I J }
+tuple_impls! { A B C D E F G H I J K }
+tuple_impls! { A B C D E F G H I J K L }
+tuple_impls! { A B C D E F G H I J K L M }
+tuple_impls! { A B C D E F G H I J K L M N }
+tuple_impls! { A B C D E F G H I J K L M N O }
+tuple_impls! { A B C D E F G H I J K L M N O P }
+tuple_impls! { A B C D E F G H I J K L M N O P Q }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X Y }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X Y Z }
+
+
+
+
