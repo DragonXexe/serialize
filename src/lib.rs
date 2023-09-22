@@ -3,7 +3,7 @@ mod test;
 #[allow(unused_imports)]
 #[macro_use]
 pub extern crate serialize_derive;
-
+const USIZE_SIZE: usize = (usize::BITS/8) as usize;
 pub use serialize_derive::Serialize;
 use std::fs;
 
@@ -168,6 +168,20 @@ impl Bytes {
         }
     }
 }
+impl Serialize for Bytes {
+    fn serialize(self) -> Bytes {
+        self
+    }
+    fn deserialize(bytes: &Bytes, mut index: usize) -> Option<Self> {
+        let field0: Vec<u8> = bytes.read(index)?;
+        index += field0.size();
+        let field1: usize = bytes.read(index)?;
+        Some(Self(field0, field1))
+    }
+    fn size(&self) -> usize {
+        self.0.size() + self.1.size()
+    }
+}
 impl From<Bytes> for Vec<u8> {
     fn from(value: Bytes) -> Self {
         value.0
@@ -324,27 +338,27 @@ impl Serialize for u64 {
 impl Serialize for usize {
     fn serialize(self) -> Bytes {
         let mut res = Bytes::new();
-        let size = (usize::BITS/8) as usize;
+        let size = USIZE_SIZE;
         for i in 0..size {
-            let byte = size-1-i;
+            let byte = size - 1 - i;
             res.push(self.get_byte(byte));
         }
         return res;
     }
     fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        let size = (usize::BITS/8) as usize;
+        let size = USIZE_SIZE;
         if !bytes.is_inbound(index + size - 1) {
             return None;
         }
         let mut res: usize = 0;
         for i in 0..size {
-            let byte = size-1-i;
-            res.set_byte(i, bytes.read_byte(byte));
+            let byte = size - 1 - i;
+            res.set_byte(i, bytes.read_byte(byte + index));
         }
         return Some(res);
     }
     fn size(&self) -> usize {
-        (usize::BITS/8) as usize
+        USIZE_SIZE
     }
 }
 impl Serialize for i8 {
@@ -449,47 +463,46 @@ impl Serialize for isize {
     fn serialize(self) -> Bytes {
         let mut res = Bytes::new();
         let bytes = self as usize;
-        let size = (isize::BITS/8) as usize;
+        let size = (isize::BITS / 8) as usize;
         for i in 0..size {
-            let byte = size-1-i;
+            let byte = size - 1 - i;
             res.push(bytes.get_byte(byte));
         }
         return res;
     }
     fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        let size = (isize::BITS/8) as usize;
+        let size = (isize::BITS / 8) as usize;
         if !bytes.is_inbound(index + size - 1) {
             return None;
         }
         let mut res: usize = 0;
         for i in 0..size {
-            let byte = size-1-i;
+            let byte = size - 1 - i;
             res.set_byte(i, bytes.read_byte(byte));
         }
         return Some(res as isize);
     }
     fn size(&self) -> usize {
-        (isize::BITS/8) as usize
+        (isize::BITS / 8) as usize
     }
 }
-
 
 impl<T: Serialize> Serialize for Vec<T> {
     fn serialize(self) -> Bytes {
         let mut bytes = Bytes::new();
-        bytes.push(self.len() as u16);
+        bytes.push(self.len());
         for item in self {
             bytes.push(item)
         }
         bytes
     }
     fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index + 1) {
+        if !bytes.is_inbound(index) {
             return None;
         }
         let mut res = vec![];
-        let len: u16 = bytes.read(index).unwrap();
-        let mut offset = 2;
+        let len: usize = bytes.read(index)?;
+        let mut offset = USIZE_SIZE;
         for _ in 0..len {
             if let Some(item) = bytes.read::<T>(index + offset as usize) {
                 offset += item.size();
@@ -501,7 +514,7 @@ impl<T: Serialize> Serialize for Vec<T> {
         return Some(res);
     }
     fn size(&self) -> usize {
-        let mut res = 2;
+        let mut res = USIZE_SIZE;
         for item in self {
             res += item.size();
         }
@@ -511,29 +524,36 @@ impl<T: Serialize> Serialize for Vec<T> {
 impl Serialize for String {
     fn serialize(self) -> Bytes {
         let mut bytes = Bytes::new();
-        bytes.push_byte(self.len() as u8);
-        for ch in self.chars() {
-            bytes.push_byte(ch as u8);
+        bytes.push(self.len());
+        for item in self.into_bytes() {
+            bytes.push(item)
         }
-        return bytes;
+        bytes
     }
     fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index) {
+        if !bytes.is_inbound(index + 1) {
+            println!("not inbound");
             return None;
         }
-        let mut res = String::new();
-        let len: u8 = bytes.read_byte(index);
-        for i in 1..len + 1 {
-            if let Some(item) = bytes.read::<char>(index + i as usize) {
+        let mut res = vec![];
+        let len: usize = bytes.read(index)?;
+        let mut offset = USIZE_SIZE;
+        for _ in 0..len {
+            if let Some(item) = bytes.read::<u8>(index + offset) {
+                offset += item.size();
                 res.push(item);
             } else {
+                println!("in loop");
                 return None;
             }
         }
-        return Some(res);
+        match std::str::from_utf8(&res) {
+            Ok(res) => Some(res.to_string()),
+            Err(_) => None,
+        }
     }
     fn size(&self) -> usize {
-        self.len() + 1
+        return USIZE_SIZE + self.len();
     }
 }
 
@@ -565,7 +585,7 @@ impl<T: Serialize> Serialize for Option<T> {
         if !is_some {
             return Some(None);
         }
-        if let Some(item) = bytes.read(index+1) {
+        if let Some(item) = bytes.read(index + 1) {
             return Some(Some(item));
         } else {
             return None;
@@ -579,57 +599,13 @@ impl<T: Serialize> Serialize for Option<T> {
     }
 }
 
-/// a special type that can be used to make strings
-/// with longer lenghts as the u16 indicates this has a len
-/// that is defined by a u16 instead of a u8 like for a normal string
-///
-pub struct U16String(String);
-impl From<String> for U16String {
-    fn from(value: String) -> Self {
-        U16String(value)
-    }
-}
-impl From<U16String> for String {
-    fn from(value: U16String) -> Self {
-        value.0
-    }
-}
-impl Serialize for U16String {
-    fn serialize(self) -> Bytes {
-        let mut bytes = Bytes::new();
-        bytes.push(self.0.len() as u16);
-        for ch in self.0.chars() {
-            bytes.push_byte(ch as u8);
-        }
-        return bytes;
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index + 1) {
-            return None;
-        }
-        let mut res = String::new();
-        let len: u16 = bytes.read(index)?;
-        for i in 2..len + 2 {
-            if let Some(item) = bytes.read::<char>(index + i as usize) {
-                res.push(item);
-            } else {
-                return None;
-            }
-        }
-        return Some(U16String(res));
-    }
-    fn size(&self) -> usize {
-        self.0.len() + 2
-    }
-}
-
-
 // implemations for floats
 impl Serialize for f32 {
     fn serialize(self) -> Bytes {
         use std::mem::transmute;
         let mut bytes = Bytes::new();
-        for byte in unsafe { transmute::<f32, [u8; 4]>(self) } { // this unsafe is oke because it correctly gets the bytes
+        for byte in unsafe { transmute::<f32, [u8; 4]>(self) } {
+            // this unsafe is oke because it correctly gets the bytes
             bytes.push_byte(byte);
         }
         return bytes;
@@ -645,7 +621,7 @@ impl Serialize for f32 {
         slice[1] = bytes.read_byte(index + 1);
         slice[2] = bytes.read_byte(index + 2);
         slice[3] = bytes.read_byte(index + 3);
-        return Some(unsafe { transmute::<[u8; 4], f32>(slice) }) // again safe for the same reasons
+        return Some(unsafe { transmute::<[u8; 4], f32>(slice) }); // again safe for the same reasons
     }
 
     fn size(&self) -> usize {
@@ -656,7 +632,8 @@ impl Serialize for f64 {
     fn serialize(self) -> Bytes {
         use std::mem::transmute;
         let mut bytes = Bytes::new();
-        for byte in unsafe { transmute::<f64, [u8; 8]>(self) } { // this unsafe is oke because it correctly gets the bytes
+        for byte in unsafe { transmute::<f64, [u8; 8]>(self) } {
+            // this unsafe is oke because it correctly gets the bytes
             bytes.push_byte(byte);
         }
         return bytes;
@@ -676,14 +653,13 @@ impl Serialize for f64 {
         slice[5] = bytes.read_byte(index + 5);
         slice[6] = bytes.read_byte(index + 6);
         slice[7] = bytes.read_byte(index + 7);
-        return Some(unsafe { transmute::<[u8; 8], f64>(slice) }) // again safe for the same reasons
+        return Some(unsafe { transmute::<[u8; 8], f64>(slice) }); // again safe for the same reasons
     }
 
     fn size(&self) -> usize {
         8
     }
 }
-
 
 macro_rules! impl_serialize_copy_for_array {(
     $($N:literal)*
@@ -697,7 +673,7 @@ macro_rules! impl_serialize_copy_for_array {(
                 }
                 return bytes;
             }
-        
+
             fn deserialize(bytes: &Bytes, mut index: usize) -> Option<Self> {
                 if !bytes.is_inbound(index + 3) {
                     return None;
@@ -711,7 +687,7 @@ macro_rules! impl_serialize_copy_for_array {(
                 }
                 return Some(res);
             }
-        
+
             fn size(&self) -> usize {
                 let mut res = 0;
                 for item in self {
@@ -719,7 +695,7 @@ macro_rules! impl_serialize_copy_for_array {(
                 }
                 return res;
             }
-        
+
         }
     )*
 )}
@@ -744,7 +720,6 @@ impl_serialize_copy_for_array!(
  0b0001000000000000 0b0010000000000000 0b0100000000000000 0b1000000000000000
 );
 
-
 impl Serialize for () {
     fn serialize(self) -> Bytes {
         Bytes::new()
@@ -759,8 +734,6 @@ impl Serialize for () {
     }
 }
 
-
-
 macro_rules! tuple_impls {
     ( $( $name:ident )+ ) => {
         #[allow(non_snake_case)]
@@ -772,7 +745,7 @@ macro_rules! tuple_impls {
                 $(bytes.append(&$name.serialize());)*
                 return bytes;
             }
-        
+
             #[allow(unused_assignments)]
             fn deserialize(bytes: &Bytes, mut index: usize) -> Option<Self> {
                 let ($($name,)+): ($($name,)+);
@@ -784,7 +757,7 @@ macro_rules! tuple_impls {
                 })*
                 return Some(($($name,)+));
             }
-        
+
             fn size(&self) -> usize {
                 let ($($name,)+) = self;
                 $($name.size() + )* 0
@@ -819,7 +792,3 @@ tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W }
 tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X }
 tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X Y }
 tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X Y Z }
-
-
-
-
