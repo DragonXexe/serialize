@@ -5,7 +5,7 @@ mod test;
 pub extern crate serialize_derive;
 const USIZE_SIZE: usize = (usize::BITS/8) as usize;
 pub use serialize_derive::Serialize;
-use std::fs;
+use std::{collections::HashMap, fs};
 
 pub trait SetGetBytes {
     fn set_byte(&mut self, byte: usize, data: u8);
@@ -598,7 +598,30 @@ impl<T: Serialize> Serialize for Option<T> {
         }
     }
 }
+impl<K: Serialize + std::cmp::Eq + std::hash::Hash, V: Serialize> Serialize for HashMap<K, V> {
+    fn serialize(self) -> Bytes {
+        self.into_iter().collect::<Vec<_>>().serialize()
+    }
 
+    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
+        let mut hashmap = HashMap::new();
+        let vec = bytes.read::<Vec<(K, V)>>(index)?;
+        for (k, v) in vec {
+            hashmap.insert(k, v);
+        }
+        Some(hashmap)
+    }
+
+    fn size(&self) -> usize {
+        let mut size = 0;
+        size += USIZE_SIZE;
+        for (k, v) in self.iter() {
+            size += k.size();
+            size += v.size();
+        }
+        size
+    }
+}
 // implemations for floats
 impl Serialize for f32 {
     fn serialize(self) -> Bytes {

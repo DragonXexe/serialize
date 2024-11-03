@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{Bytes, Serialize};
 
 #[test]
@@ -58,7 +60,18 @@ pub enum CustomOption<T> {
 //     keys: Vec<K>,
 //     vals: Vec<V>,
 // }
-
+#[test]
+fn hash_map_test() {
+    let mut hashmap: HashMap<String, i32> = HashMap::new();
+    hashmap.insert("Hello".to_string(), 103);
+    hashmap.insert("Three".to_string(), 3);
+    hashmap.insert("Hey".to_string(), 4);
+    let bytes = hashmap.serialize();
+    let hashmap = bytes.read::<HashMap<String, i32>>(0).unwrap();
+    assert_eq!(hashmap.get(&"Hello".to_string()), Some(&103));
+    assert_eq!(hashmap.get(&"Three".to_string()), Some(&3));
+    assert_eq!(hashmap.get(&"Hey".to_string()), Some(&4));
+}
 #[test]
 fn tuple_test() {
     let tuple: (u8, String, u8, u8, u8, u8) = (34, "test".to_string(), 34, 34, 34, 34);
