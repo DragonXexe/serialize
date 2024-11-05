@@ -310,28 +310,24 @@ impl_for_tuple!(A, B, C);
 impl_for_tuple!(A, B, C, D);
 impl_for_tuple!(A, B, C, D, E);
 impl_for_tuple!(A, B, C, D, E, F);
-// impl_for_tuple!(A, B, C, D, E, F, G);
-// impl_for_tuple!(A, B, C, D, E, F, G, H);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y);
-// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);
-#[derive(Serialize, Deserialize)]
-pub enum CustomOption<T> {
-    Some(T),
-    None,
-}
+impl_for_tuple!(A, B, C, D, E, F, G);
+impl_for_tuple!(A, B, C, D, E, F, G, H);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y);
+impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);
+
