@@ -1,817 +1,337 @@
+
+use std::{collections::HashMap, error::Error, vec};
+
+
 #[cfg(test)]
 mod test;
 #[allow(unused_imports)]
 #[macro_use]
 pub extern crate serialize_derive;
-const USIZE_SIZE: usize = (usize::BITS/8) as usize;
-pub use serialize_derive::Serialize;
-use std::{collections::HashMap, fs};
 
-pub trait SetGetBytes {
-    fn set_byte(&mut self, byte: usize, data: u8);
-    fn get_byte(&self, byte: usize) -> u8;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Bytes {
+    data: Vec<u8>,
+    current: usize,
 }
-impl SetGetBytes for u64 {
-    fn set_byte(&mut self, byte: usize, data: u8) {
-        let mask: u64 = 0xff << byte * 8;
-        let temp: u64 = *self & !mask;
-        *self = temp | ((data as u64) << byte * 8);
-    }
-
-    fn get_byte(&self, byte: usize) -> u8 {
-        return ((*self >> 8 * byte) & 0xff) as u8;
-    }
-}
-impl SetGetBytes for u32 {
-    fn set_byte(&mut self, byte: usize, data: u8) {
-        let mask: u32 = 0xff << byte * 8;
-        let temp: u32 = *self & !mask;
-        *self = temp | ((data as u32) << byte * 8);
-    }
-
-    fn get_byte(&self, byte: usize) -> u8 {
-        return ((*self >> 8 * byte) & 0xff) as u8;
-    }
-}
-impl SetGetBytes for u16 {
-    fn set_byte(&mut self, byte: usize, data: u8) {
-        let mask: u16 = 0xff << byte * 8;
-        let temp: u16 = *self & !mask;
-        *self = temp | ((data as u16) << byte * 8);
-    }
-
-    fn get_byte(&self, byte: usize) -> u8 {
-        return ((*self >> 8 * byte) & 0xff) as u8;
-    }
-}
-impl SetGetBytes for usize {
-    fn set_byte(&mut self, byte: usize, data: u8) {
-        let mask: usize = 0xff << byte * 8;
-        let temp: usize = *self & !mask;
-        *self = temp | ((data as usize) << byte * 8);
-    }
-
-    fn get_byte(&self, byte: usize) -> u8 {
-        return ((*self >> 8 * byte) & 0xff) as u8;
-    }
-}
-
-/// This is the main part of this crate
-/// implement this trait for the things you want to serialize and deserialize
-///
-/// this is meant to be used for saving things in files or transmitting things through buffers
-/// # Warning
-/// the normal String has maximum length of 255
-/// if you want longer strings use the U16String wich allows
-/// for strings with a length 65535
-///
-/// # Example
-/// ```
-/// use serialr::Serialize;
-/// // string implements serialize
-/// let string = "Hello World".to_string();
-/// // serialize the string
-/// let bytes = string.clone().serialize();
-/// // deserialize from the beginning of the bytes
-/// let found_string = String::deserialize(&bytes, 0).unwrap();
-/// // the result will be the same
-/// assert_eq!(string, found_string);
-/// ```
-///
-pub trait Serialize: Sized {
-    fn serialize(self) -> Bytes;
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self>;
-    fn size(&self) -> usize;
-}
-
-/// This is the struct returned by serialize
-///
-/// Bytes can be used to save and load from files
-/// and you are able to read and write to it
-/// the main way you can write to it is by the read, push and write
-/// functions they can use the turbo fish notation to write and read and push
-/// any type that implements the Serialize trait
-///
-/// # Example
-/// ```
-/// use serialr::Bytes;
-/// let mut bytes = Bytes::new();
-/// let string = "Hello World".to_string();
-/// bytes.push(string.clone());
-/// let found_string = bytes.read::<String>(0).unwrap();
-/// assert_eq!(string, found_string);
-/// ```
-#[derive(Debug, Clone, Default)]
-pub struct Bytes(Vec<u8>, usize);
 impl Bytes {
     pub fn new() -> Self {
-        Self(vec![], 0)
-    }
-    pub fn to_vec(self) -> Vec<u8> {
-        self.0
-    }
-    pub fn set_len(&mut self, len: usize) {
-        while len > self.0.len() {
-            self.0.push(0)
-        }
-        while len < self.0.len() {
-            self.0.pop();
+        Self {
+            data: Vec::new(),
+            current: 0,
         }
     }
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.data.len()
     }
-    pub fn is_inbound(&self, index: usize) -> bool {
-        index < self.0.len()
+    pub fn reset(&mut self) {
+        self.current = 0;
     }
-
-    pub fn read_byte(&self, index: usize) -> u8 {
-        self.0[index]
-    }
-    pub fn write_byte(&mut self, index: usize, byte: u8) {
-        self.0[index] = byte;
-    }
-    pub fn push_byte(&mut self, byte: u8) {
-        self.0.push(byte);
-    }
-
-    pub fn write<T: Serialize>(&mut self, index: usize, val: T) {
-        let bytes = val.serialize();
-        self.insert(index, &bytes);
-    }
-    pub fn read<T: Serialize>(&self, index: usize) -> Option<T> {
-        T::deserialize(self, index)
-    }
-    pub fn push<T: Serialize>(&mut self, val: T) {
-        let bytes = val.serialize();
-        self.append(&bytes);
-    }
-
-    pub fn insert(&mut self, index: usize, bytes: &Bytes) {
-        for i in 0..bytes.len() {
-            self.0[index + i] = bytes.read_byte(i);
-        }
-    }
-    pub fn append(&mut self, bytes: &Bytes) {
-        for byte in &bytes.0 {
-            self.0.push(*byte)
-        }
-    }
-
-    pub fn write_to_file(self, path: String) -> Result<(), std::io::Error> {
-        fs::write::<String, Vec<u8>>(path, self.into())
-    }
-    pub fn read_from_file(path: String) -> Result<Bytes, std::io::Error> {
-        match fs::read(path) {
-            Ok(ok) => Ok(Bytes(ok, 0)),
-            Err(err) => Err(err),
-        }
-    }
-}
-impl Serialize for Bytes {
-    fn serialize(self) -> Bytes {
-        self
-    }
-    fn deserialize(bytes: &Bytes, mut index: usize) -> Option<Self> {
-        let field0: Vec<u8> = bytes.read(index)?;
-        index += field0.size();
-        let field1: usize = bytes.read(index)?;
-        Some(Self(field0, field1))
-    }
-    fn size(&self) -> usize {
-        self.0.size() + self.1.size()
-    }
-}
-impl From<Bytes> for Vec<u8> {
-    fn from(value: Bytes) -> Self {
-        value.0
+    pub fn push(&mut self, byte: u8) {
+        self.data.push(byte)
     }
 }
 impl From<Vec<u8>> for Bytes {
     fn from(value: Vec<u8>) -> Self {
-        Self(value, 0)
+        Self {
+            data: value,
+            current: 0,
+        }
     }
 }
 impl From<&[u8]> for Bytes {
     fn from(value: &[u8]) -> Self {
-        Self(value.to_vec(), 0)
-    }
-}
-impl Iterator for Bytes {
-    type Item = u8;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(byte) = self.0.get(self.1) {
-            self.1 += 1;
-            return Some(*byte);
-        } else {
-            return None;
+        Self {
+            data: value.to_vec(),
+            current: 0,
         }
     }
 }
-
-impl Serialize for bool {
-    fn serialize(self) -> Bytes {
-        Bytes(vec![self as u8], 0)
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if bytes.is_inbound(index) {
-            return Some(bytes.read_byte(index) != 0);
-        } else {
-            return None;
-        }
-    }
-    fn size(&self) -> usize {
-        1
+impl Into<Vec<u8>> for Bytes {
+    fn into(self) -> Vec<u8> {
+        self.data
     }
 }
-impl Serialize for u8 {
-    fn serialize(self) -> Bytes {
-        Bytes(vec![self], 0)
+impl std::io::Write for Bytes {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        for byte in buf {
+            self.data.push(*byte);
+        }
+        Ok(buf.len())
     }
 
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if bytes.is_inbound(index) {
-            return Some(bytes.read_byte(index));
-        } else {
-            return None;
-        }
-    }
-
-    fn size(&self) -> usize {
-        1
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
-impl Serialize for char {
-    fn serialize(self) -> Bytes {
-        Bytes(vec![self as u8], 0)
-    }
-
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if bytes.is_inbound(index) {
-            return Some(bytes.read_byte(index) as char);
-        } else {
-            return None;
+impl std::io::Read for Bytes {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        for i in 0..buf.len() {
+            let byte= match self.data.get(self.current) {
+                Some(byte) => *byte,
+                None => return Ok(i),
+            };
+            buf[i] = byte;
+            self.current += 1;
         }
-    }
-
-    fn size(&self) -> usize {
-        1
+        Ok(buf.len())
     }
 }
-impl Serialize for u16 {
-    fn serialize(self) -> Bytes {
-        let mut res = Bytes::new();
-        res.push(self.get_byte(1));
-        res.push(self.get_byte(0));
-        return res;
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index + 1) {
-            return None;
+#[derive(Debug)]
+pub enum SerializeError {
+    IOError(std::io::Error),
+    InvalidData,
+}
+impl std::fmt::Display for SerializeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SerializeError::IOError(error) => write!(f, "{}", error),
+            SerializeError::InvalidData => write!(f, "got invalid data while deserializing"),
         }
-        let mut res = 0;
-        res.set_byte(0, bytes.read_byte(index + 1));
-        res.set_byte(1, bytes.read_byte(index + 0));
-        return Some(res);
-    }
-    fn size(&self) -> usize {
-        2
     }
 }
-impl Serialize for u32 {
-    fn serialize(self) -> Bytes {
-        let mut res = Bytes::new();
-        res.push(self.get_byte(3));
-        res.push(self.get_byte(2));
-        res.push(self.get_byte(1));
-        res.push(self.get_byte(0));
-        return res;
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index + 3) {
-            return None;
-        }
-        let mut res = 0;
-        res.set_byte(0, bytes.read_byte(index + 3));
-        res.set_byte(1, bytes.read_byte(index + 2));
-        res.set_byte(2, bytes.read_byte(index + 1));
-        res.set_byte(3, bytes.read_byte(index + 0));
-        return Some(res);
-    }
-    fn size(&self) -> usize {
-        4
-    }
-}
-impl Serialize for u64 {
-    fn serialize(self) -> Bytes {
-        let mut res = Bytes::new();
-        res.push(self.get_byte(7));
-        res.push(self.get_byte(6));
-        res.push(self.get_byte(5));
-        res.push(self.get_byte(4));
-        res.push(self.get_byte(3));
-        res.push(self.get_byte(2));
-        res.push(self.get_byte(1));
-        res.push(self.get_byte(0));
-        return res;
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index + 7) {
-            return None;
-        }
-        let mut res = 0;
-        res.set_byte(0, bytes.read_byte(index + 7));
-        res.set_byte(1, bytes.read_byte(index + 6));
-        res.set_byte(2, bytes.read_byte(index + 5));
-        res.set_byte(3, bytes.read_byte(index + 4));
-        res.set_byte(4, bytes.read_byte(index + 3));
-        res.set_byte(5, bytes.read_byte(index + 2));
-        res.set_byte(6, bytes.read_byte(index + 1));
-        res.set_byte(7, bytes.read_byte(index + 0));
-        return Some(res);
-    }
-    fn size(&self) -> usize {
-        8
-    }
-}
-impl Serialize for usize {
-    fn serialize(self) -> Bytes {
-        let mut res = Bytes::new();
-        let size = USIZE_SIZE;
-        for i in 0..size {
-            let byte = size - 1 - i;
-            res.push(self.get_byte(byte));
-        }
-        return res;
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        let size = USIZE_SIZE;
-        if !bytes.is_inbound(index + size - 1) {
-            return None;
-        }
-        let mut res: usize = 0;
-        for i in 0..size {
-            let byte = size - 1 - i;
-            res.set_byte(i, bytes.read_byte(byte + index));
-        }
-        return Some(res);
-    }
-    fn size(&self) -> usize {
-        USIZE_SIZE
-    }
-}
-impl Serialize for i8 {
-    fn serialize(self) -> Bytes {
-        let mut bytes = Bytes::new();
-        bytes.write_byte(0, self as u8);
-        return bytes;
-    }
-
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if bytes.is_inbound(index) {
-            return Some(bytes.read_byte(index) as i8);
-        } else {
-            return None;
-        }
-    }
-
-    fn size(&self) -> usize {
-        1
-    }
-}
-impl Serialize for i16 {
-    fn serialize(self) -> Bytes {
-        let bytes = self as u16;
-        let mut res = Bytes::new();
-        res.push(bytes.get_byte(1));
-        res.push(bytes.get_byte(0));
-        return res;
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index + 1) {
-            return None;
-        }
-        let mut res: u16 = 0;
-        res.set_byte(0, bytes.read_byte(index + 1));
-        res.set_byte(1, bytes.read_byte(index + 0));
-        return Some(res as i16);
-    }
-    fn size(&self) -> usize {
-        2
-    }
-}
-impl Serialize for i32 {
-    fn serialize(self) -> Bytes {
-        let bytes = self as u32;
-        let mut res = Bytes::new();
-        res.push(bytes.get_byte(3));
-        res.push(bytes.get_byte(2));
-        res.push(bytes.get_byte(1));
-        res.push(bytes.get_byte(0));
-        return res;
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index + 3) {
-            return None;
-        }
-        let mut res: u32 = 0;
-        res.set_byte(0, bytes.read_byte(index + 3));
-        res.set_byte(1, bytes.read_byte(index + 2));
-        res.set_byte(2, bytes.read_byte(index + 1));
-        res.set_byte(3, bytes.read_byte(index + 0));
-        return Some(res as i32);
-    }
-    fn size(&self) -> usize {
-        4
-    }
-}
-impl Serialize for i64 {
-    fn serialize(self) -> Bytes {
-        let bytes = self as u64;
-        let mut res = Bytes::new();
-        res.push(bytes.get_byte(7));
-        res.push(bytes.get_byte(6));
-        res.push(bytes.get_byte(5));
-        res.push(bytes.get_byte(4));
-        res.push(bytes.get_byte(3));
-        res.push(bytes.get_byte(2));
-        res.push(bytes.get_byte(1));
-        res.push(bytes.get_byte(0));
-        return res;
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index + 7) {
-            return None;
-        }
-        let mut res: u64 = 0;
-        res.set_byte(0, bytes.read_byte(index + 7));
-        res.set_byte(1, bytes.read_byte(index + 6));
-        res.set_byte(2, bytes.read_byte(index + 5));
-        res.set_byte(3, bytes.read_byte(index + 4));
-        res.set_byte(4, bytes.read_byte(index + 3));
-        res.set_byte(5, bytes.read_byte(index + 2));
-        res.set_byte(6, bytes.read_byte(index + 1));
-        res.set_byte(7, bytes.read_byte(index + 0));
-        return Some(res as i64);
-    }
-    fn size(&self) -> usize {
-        8
-    }
-}
-impl Serialize for isize {
-    fn serialize(self) -> Bytes {
-        let mut res = Bytes::new();
-        let bytes = self as usize;
-        let size = (isize::BITS / 8) as usize;
-        for i in 0..size {
-            let byte = size - 1 - i;
-            res.push(bytes.get_byte(byte));
-        }
-        return res;
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        let size = (isize::BITS / 8) as usize;
-        if !bytes.is_inbound(index + size - 1) {
-            return None;
-        }
-        let mut res: usize = 0;
-        for i in 0..size {
-            let byte = size - 1 - i;
-            res.set_byte(i, bytes.read_byte(byte));
-        }
-        return Some(res as isize);
-    }
-    fn size(&self) -> usize {
-        (isize::BITS / 8) as usize
+impl Error for SerializeError {}
+impl From<std::io::Error> for SerializeError {
+    fn from(value: std::io::Error) -> Self {
+        Self::IOError(value)
     }
 }
 
-impl<T: Serialize> Serialize for Vec<T> {
-    fn serialize(self) -> Bytes {
-        let mut bytes = Bytes::new();
-        bytes.push(self.len());
-        for item in self {
-            bytes.push(item)
-        }
-        bytes
+
+pub trait Serialize: 'static {
+    fn serialize<B: std::io::Write>(self, buf: &mut B) -> Result<(), SerializeError>;
+}
+
+pub trait Deserialize: Sized + 'static {
+    fn deserialize<B: std::io::Read>(buf: &mut B) -> Result<Self, SerializeError>;
+}
+
+
+pub trait SerialWrite: std::io::Write {
+    fn write_serialized<S: Serialize>(&mut self, val: S) -> Result<(), SerializeError>;
+}
+impl<B: std::io::Write> SerialWrite for B {
+    fn write_serialized<S: Serialize>(&mut self, val: S) -> Result<(), SerializeError> {
+        val.serialize(self)
     }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index) {
-            return None;
-        }
-        let mut res = vec![];
-        let len: usize = bytes.read(index)?;
-        let mut offset = USIZE_SIZE;
-        for _ in 0..len {
-            if let Some(item) = bytes.read::<T>(index + offset as usize) {
-                offset += item.size();
-                res.push(item);
-            } else {
-                return None;
+}
+pub trait SerialRead: std::io::Read {
+    fn read_serialized<S: Deserialize>(&mut self) -> Result<S, SerializeError>;
+}
+impl<B: std::io::Read> SerialRead for B {
+    fn read_serialized<S: Deserialize>(&mut self) -> Result<S, SerializeError> {
+        S::deserialize(self)
+    }
+}
+
+macro_rules! impl_num {
+    ($num:ty) => {
+        impl Serialize for $num {
+            fn serialize<B: std::io::Write>(self, buf: &mut B) -> Result<(), SerializeError>{
+                let bytes = self.to_be_bytes();
+                buf.write_all(&bytes)?;
+                Ok(())
             }
         }
-        return Some(res);
-    }
-    fn size(&self) -> usize {
-        let mut res = USIZE_SIZE;
-        for item in self {
-            res += item.size();
+        impl Deserialize for $num {
+            fn deserialize<B: std::io::Read>(buf: &mut B) -> Result<Self, SerializeError> {
+                let bytes = &mut [0; size_of::<Self>()];
+                buf.read_exact(bytes)?;
+                Ok(Self::from_be_bytes(*bytes))
+            }
         }
-        return res;
+    };
+    ($($num:ty),*) => {
+        $(
+            impl_num!($num);
+        )*
+    }
+}
+impl_num!(
+    u8, u16, u32, u64, usize,
+    i8, i16, i32, i64, isize,
+    f32, f64
+);
+
+impl<T: Serialize> Serialize for Vec<T> {
+    fn serialize<B: std::io::Write>(self, buf: &mut B) -> Result<(), SerializeError> {
+        buf.write_serialized(self.len())?;
+        for item in self {
+            buf.write_serialized(item)?;
+        }
+        Ok(())
+    }
+}
+impl<T: Deserialize> Deserialize for Vec<T> {
+    fn deserialize<B: std::io::Read>(buf: &mut B) -> Result<Self, SerializeError> {
+        let mut this = vec![];
+        let len = buf.read_serialized::<usize>()?;
+        for _ in 0..len {
+            this.push(buf.read_serialized::<T>()?);
+        }
+        Ok(this)
     }
 }
 impl Serialize for String {
-    fn serialize(self) -> Bytes {
-        let mut bytes = Bytes::new();
-        bytes.push(self.len());
-        for item in self.into_bytes() {
-            bytes.push(item)
+    fn serialize<B: std::io::Write>(self, buf: &mut B) -> Result<(), SerializeError> {
+        buf.write_serialized(self.len())?;
+        for item in self.bytes() {
+            buf.write_serialized(item)?;
         }
-        bytes
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        if !bytes.is_inbound(index + 1) {
-            println!("not inbound");
-            return None;
-        }
-        let mut res = vec![];
-        let len: usize = bytes.read(index)?;
-        let mut offset = USIZE_SIZE;
-        for _ in 0..len {
-            if let Some(item) = bytes.read::<u8>(index + offset) {
-                offset += item.size();
-                res.push(item);
-            } else {
-                println!("in loop");
-                return None;
-            }
-        }
-        match std::str::from_utf8(&res) {
-            Ok(res) => Some(res.to_string()),
-            Err(_) => None,
-        }
-    }
-    fn size(&self) -> usize {
-        return USIZE_SIZE + self.len();
+        Ok(())
     }
 }
-
+impl Deserialize for String {
+    fn deserialize<B: std::io::Read>(buf: &mut B) -> Result<Self, SerializeError> {
+        let len = buf.read_serialized::<usize>()?;
+        let mut bytes = vec![0; len];
+        buf.read_exact(&mut bytes)?;
+        match String::from_utf8(bytes) {
+            Ok(string) => Ok(string),
+            Err(_) => Err(SerializeError::InvalidData),
+        }
+    }
+}
+impl<T: Serialize> Serialize for Box<T> {
+    fn serialize<B: std::io::Write>(self, buf: &mut B) -> Result<(), SerializeError> {
+        buf.write_serialized(*self)
+    }
+}
+impl<T: Deserialize> Deserialize for Box<T> {
+    fn deserialize<B: std::io::Read>(buf: &mut B) -> Result<Self, SerializeError> {
+        let inner = buf.read_serialized::<T>()?;
+        Ok(Self::new(inner))
+    }
+}
 impl<T: Serialize> Serialize for Option<T> {
-    fn serialize(self) -> Bytes {
-        if self.is_none() {
-            let mut bytes = Bytes::new();
-            bytes.push_byte(0);
-            return bytes;
-        } else {
-            let mut bytes = Bytes::new();
-            bytes.push(self.unwrap());
-            return bytes;
-        }
-    }
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        let is_some: bool;
-        if let Some(discrimenent) = bytes.read::<u8>(index) {
-            if discrimenent == 0 {
-                is_some = false;
-            } else if discrimenent == 1 {
-                is_some = true;
-            } else {
-                return None;
+    fn serialize<B: std::io::Write>(
+        self,
+        buf: &mut B,
+    ) -> Result<(), crate::SerializeError> {
+        use crate::SerialWrite;
+        let discriminant = { unsafe { *((&self) as *const _ as *const u64) } };
+        buf.write_serialized(discriminant)?;
+        match self {
+            Self::Some(f0) => {
+                buf.write_serialized(f0)?;
             }
-        } else {
-            return None;
+            Self::None => {}
         }
-        if !is_some {
-            return Some(None);
-        }
-        if let Some(item) = bytes.read(index + 1) {
-            return Some(Some(item));
-        } else {
-            return None;
-        }
+        Ok(())
     }
-    fn size(&self) -> usize {
-        1 + match self {
-            Some(item) => item.size(),
-            None => 0,
+}
+impl<T: Deserialize> Deserialize for Option<T> {
+    fn deserialize<B: std::io::Read>(
+        buf: &mut B,
+    ) -> Result<Self, crate::SerializeError> {
+        use crate::SerialRead;
+        let discriminant: u64 = buf.read_serialized::<u64>()?;
+        match discriminant {
+            0u64 => {
+                let f0 = buf.read_serialized()?;
+                return Ok(Self::Some(f0));
+            }
+            1u64 => Ok(Self::None),
+            _ => Err(crate::SerializeError::InvalidData),
         }
     }
 }
-impl<K: Serialize + std::cmp::Eq + std::hash::Hash, V: Serialize> Serialize for HashMap<K, V> {
-    fn serialize(self) -> Bytes {
-        self.into_iter().collect::<Vec<_>>().serialize()
-    }
-
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        let mut hashmap = HashMap::new();
-        let vec = bytes.read::<Vec<(K, V)>>(index)?;
-        for (k, v) in vec {
-            hashmap.insert(k, v);
+impl<K: Serialize, V: Serialize> Serialize for HashMap<K, V> {
+    fn serialize<B: std::io::Write>(self, buf: &mut B) -> Result<(), SerializeError> {
+        let items = self.into_iter();
+        buf.write_serialized(items.len())?;
+        for item in items {
+            buf.write_serialized(item.0)?;
+            buf.write_serialized(item.1)?;
         }
-        Some(hashmap)
-    }
-
-    fn size(&self) -> usize {
-        let mut size = 0;
-        size += USIZE_SIZE;
-        for (k, v) in self.iter() {
-            size += k.size();
-            size += v.size();
-        }
-        size
+        Ok(())
     }
 }
-// implemations for floats
-impl Serialize for f32 {
-    fn serialize(self) -> Bytes {
-        use std::mem::transmute;
-        let mut bytes = Bytes::new();
-        for byte in unsafe { transmute::<f32, [u8; 4]>(self) } {
-            // this unsafe is oke because it correctly gets the bytes
-            bytes.push_byte(byte);
-        }
-        return bytes;
-    }
+impl<K: Deserialize + std::cmp::Eq + std::hash::Hash, V: Deserialize> Deserialize for HashMap<K, V> {
+    fn deserialize<B: std::io::Read>(buf: &mut B) -> Result<Self, SerializeError> {
+        let len = buf.read_serialized::<usize>()?;
+        let mut this = HashMap::new();
 
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        use std::mem::transmute;
-        if !bytes.is_inbound(index + 3) {
-            return None;
+        for _ in 0..len {
+            let key = buf.read_serialized::<K>()?;
+            let val = buf.read_serialized::<V>()?;
+            this.insert(key, val);
         }
-        let mut slice: [u8; 4] = [0; 4];
-        slice[0] = bytes.read_byte(index + 0);
-        slice[1] = bytes.read_byte(index + 1);
-        slice[2] = bytes.read_byte(index + 2);
-        slice[3] = bytes.read_byte(index + 3);
-        return Some(unsafe { transmute::<[u8; 4], f32>(slice) }); // again safe for the same reasons
-    }
 
-    fn size(&self) -> usize {
-        4
-    }
-}
-impl Serialize for f64 {
-    fn serialize(self) -> Bytes {
-        use std::mem::transmute;
-        let mut bytes = Bytes::new();
-        for byte in unsafe { transmute::<f64, [u8; 8]>(self) } {
-            // this unsafe is oke because it correctly gets the bytes
-            bytes.push_byte(byte);
-        }
-        return bytes;
-    }
-
-    fn deserialize(bytes: &Bytes, index: usize) -> Option<Self> {
-        use std::mem::transmute;
-        if !bytes.is_inbound(index + 3) {
-            return None;
-        }
-        let mut slice: [u8; 8] = [0; 8];
-        slice[0] = bytes.read_byte(index + 0);
-        slice[1] = bytes.read_byte(index + 1);
-        slice[2] = bytes.read_byte(index + 2);
-        slice[3] = bytes.read_byte(index + 3);
-        slice[4] = bytes.read_byte(index + 4);
-        slice[5] = bytes.read_byte(index + 5);
-        slice[6] = bytes.read_byte(index + 6);
-        slice[7] = bytes.read_byte(index + 7);
-        return Some(unsafe { transmute::<[u8; 8], f64>(slice) }); // again safe for the same reasons
-    }
-
-    fn size(&self) -> usize {
-        8
+        return Ok(this)
     }
 }
 
-macro_rules! impl_serialize_copy_for_array {(
-    $($N:literal)*
-) => (
-    $(
-        impl<T : Serialize + Default + Copy> Serialize for [T; $N] {
-            fn serialize(self) -> Bytes {
-                let mut bytes = Bytes::new();
-                for item in self {
-                    bytes.push(item);
-                }
-                return bytes;
-            }
-
-            fn deserialize(bytes: &Bytes, mut index: usize) -> Option<Self> {
-                if !bytes.is_inbound(index + 3) {
-                    return None;
-                }
-                let mut res: [T; $N] = [T::default(); $N];
-                for i in 0..$N {
-                    if let Some(item) = bytes.read::<T>(index) {
-                        index += item.size();
-                        res[i] = item;
-                    }
-                }
-                return Some(res);
-            }
-
-            fn size(&self) -> usize {
-                let mut res = 0;
-                for item in self {
-                    res += item.size();
-                }
-                return res;
-            }
-
+impl<T: Serialize, const N: usize> Serialize for [T; N] {
+    fn serialize<B: std::io::Write>(self, buf: &mut B) -> Result<(), SerializeError> {
+        for item in self.into_iter() {
+            buf.write_serialized(item)?
         }
-    )*
-)}
-impl_serialize_copy_for_array!(
- 0x00 0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08 0x09 0x0A 0x0B 0x0C 0x0D 0x0E 0x0F
- 0x10 0x11 0x12 0x13 0x14 0x15 0x16 0x17 0x18 0x19 0x1A 0x1B 0x1C 0x1D 0x1E 0x1F
- 0x20 0x21 0x22 0x23 0x24 0x25 0x26 0x27 0x28 0x29 0x2A 0x2B 0x2C 0x2D 0x2E 0x2F
- 0x30 0x31 0x32 0x33 0x34 0x35 0x36 0x37 0x38 0x39 0x3A 0x3B 0x3C 0x3D 0x3E 0x3F
- 0x40 0x41 0x42 0x43 0x44 0x45 0x46 0x47 0x48 0x49 0x4A 0x4B 0x4C 0x4D 0x4E 0x4F
- 0x50 0x51 0x52 0x53 0x54 0x55 0x56 0x57 0x58 0x59 0x5A 0x5B 0x5C 0x5D 0x5E 0x5F
- 0x60 0x61 0x62 0x63 0x64 0x65 0x66 0x67 0x68 0x69 0x6A 0x6B 0x6C 0x6D 0x6E 0x6F
- 0x70 0x71 0x72 0x73 0x74 0x75 0x76 0x77 0x78 0x79 0x7A 0x7B 0x7C 0x7D 0x7E 0x7F
- 0x80 0x81 0x82 0x83 0x84 0x85 0x86 0x87 0x88 0x89 0x8A 0x8B 0x8C 0x8D 0x8E 0x8F
- 0x90 0x91 0x92 0x93 0x94 0x95 0x96 0x97 0x98 0x99 0x9A 0x9B 0x9C 0x9D 0x9E 0x9F
- 0xA0 0xA1 0xA2 0xA3 0xA4 0xA5 0xA6 0xA7 0xA8 0xA9 0xAA 0xAB 0xAC 0xAD 0xAE 0xAF
- 0xB0 0xB1 0xB2 0xB3 0xB4 0xB5 0xB6 0xB7 0xB8 0xB9 0xBA 0xBB 0xBC 0xBD 0xBE 0xBF
- 0xC0 0xC1 0xC2 0xC3 0xC4 0xC5 0xC6 0xC7 0xC8 0xC9 0xCA 0xCB 0xCC 0xCD 0xCE 0xCF
- 0xD0 0xD1 0xD2 0xD3 0xD4 0xD5 0xD6 0xD7 0xD8 0xD9 0xDA 0xDB 0xDC 0xDD 0xDE 0xDF
- 0xE0 0xE1 0xE2 0xE3 0xE4 0xE5 0xE6 0xE7 0xE8 0xE9 0xEA 0xEB 0xEC 0xED 0xEE 0xEF
- 0xF0 0xF1 0xF2 0xF3 0xF4 0xF5 0xF6 0xF7 0xF8 0xF9 0xFA 0xFB 0xFC 0xFD 0xFE 0xFF
- 0b0000000100000000 0b0000001000000000 0b0000010000000000 0b0000100000000000
- 0b0001000000000000 0b0010000000000000 0b0100000000000000 0b1000000000000000
-);
-
-impl Serialize for () {
-    fn serialize(self) -> Bytes {
-        Bytes::new()
+        Ok(())
     }
+}
+impl<T: Deserialize, const N: usize> Deserialize for [T; N] {
+    fn deserialize<B: std::io::Read>(buf: &mut B) -> Result<Self, SerializeError> {
+        use std::mem::MaybeUninit;
+        let mut arr: [MaybeUninit<T>; N] = [const { MaybeUninit::zeroed() }; N];
 
-    fn deserialize(_bytes: &Bytes, _index: usize) -> Option<Self> {
-        Some(())
-    }
+        for i in 0..N {
+            arr[i] = MaybeUninit::new(T::deserialize(buf)?);
+        }
 
-    fn size(&self) -> usize {
-        0
+        // SAFETY: All elements of `arr` have been initialized.
+        Ok(unsafe { std::mem::transmute_copy(&arr) })
     }
 }
 
-macro_rules! tuple_impls {
-    ( $( $name:ident )+ ) => {
-        #[allow(non_snake_case)]
-        impl<$($name: Serialize),+> Serialize for ($($name,)+)
-        {
-            fn serialize(self) -> Bytes {
-                let ($($name,)+) = self;
-                let mut bytes = Bytes::new();
-                $(bytes.append(&$name.serialize());)*
-                return bytes;
+macro_rules! impl_for_tuple {
+    ($($name:ident),*) => {
+        impl<$($name: Serialize),*> Serialize for ($($name),*) {
+            fn serialize<Buf: std::io::Write>(self, buf: &mut Buf) -> Result<(), SerializeError> {
+                #[allow(non_snake_case)]
+                let ($($name),*) = self;
+                $(
+                    $name.serialize(buf)?;
+                )*
+                Ok(())
             }
+        }
 
-            #[allow(unused_assignments)]
-            fn deserialize(bytes: &Bytes, mut index: usize) -> Option<Self> {
-                let ($($name,)+): ($($name,)+);
-                $(if let Some(field) = bytes.read::<$name>(index) {
-                    index += field.size();
-                    $name = field;
-                } else {
-                    return None;
-                })*
-                return Some(($($name,)+));
-            }
-
-            fn size(&self) -> usize {
-                let ($($name,)+) = self;
-                $($name.size() + )* 0
+        impl<$($name: Deserialize),*> Deserialize for ($($name),*) {
+            fn deserialize<Buf: std::io::Read>(buf: &mut Buf) -> Result<Self, SerializeError> {
+                Ok(($(
+                    $name::deserialize(buf)?
+                ),*))
             }
         }
     };
 }
-
-tuple_impls! { A }
-tuple_impls! { A B }
-tuple_impls! { A B C }
-tuple_impls! { A B C D }
-tuple_impls! { A B C D E }
-tuple_impls! { A B C D E F }
-tuple_impls! { A B C D E F G }
-tuple_impls! { A B C D E F G H }
-tuple_impls! { A B C D E F G H I }
-tuple_impls! { A B C D E F G H I J }
-tuple_impls! { A B C D E F G H I J K }
-tuple_impls! { A B C D E F G H I J K L }
-tuple_impls! { A B C D E F G H I J K L M }
-tuple_impls! { A B C D E F G H I J K L M N }
-tuple_impls! { A B C D E F G H I J K L M N O }
-tuple_impls! { A B C D E F G H I J K L M N O P }
-tuple_impls! { A B C D E F G H I J K L M N O P Q }
-tuple_impls! { A B C D E F G H I J K L M N O P Q R }
-tuple_impls! { A B C D E F G H I J K L M N O P Q R S }
-tuple_impls! { A B C D E F G H I J K L M N O P Q R S T }
-tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U }
-tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V }
-tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W }
-tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X }
-tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X Y }
-tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X Y Z }
+impl_for_tuple!(A, B);
+impl_for_tuple!(A, B, C);
+impl_for_tuple!(A, B, C, D);
+impl_for_tuple!(A, B, C, D, E);
+impl_for_tuple!(A, B, C, D, E, F);
+// impl_for_tuple!(A, B, C, D, E, F, G);
+// impl_for_tuple!(A, B, C, D, E, F, G, H);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y);
+// impl_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);
+#[derive(Serialize, Deserialize)]
+pub enum CustomOption<T> {
+    Some(T),
+    None,
+}
